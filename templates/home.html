@@ -5,94 +5,83 @@
   <h2>Hi, {{ name }}</h2>
 </div>
 
-<div class="card-row">
-  <div class="stat-card">
-    <div class="stat-label">Questions answered</div>
-    <div class="stat-value">{{ total_attempted }}</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-label">Accuracy</div>
-    <div class="stat-value">{{ accuracy }}%</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-label">Drill sessions</div>
-    <div class="stat-value">{{ sessions_done }}</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-label">Timed modules</div>
-    <div class="stat-value">{{ timed_done }}</div>
-  </div>
-</div>
+<p class="stat-summary">
+  {{ total_attempted }} answered &middot; {{ accuracy }}% accuracy &middot; {{ sessions_done }} drills &middot; {{ timed_done }} timed
+</p>
 
 <div class="action-row">
   <a href="{{ url_for('drill_pick') }}" class="btn-primary">Start Drill</a>
   <a href="{{ url_for('module_pick') }}" class="btn-secondary">Challenge Session</a>
 </div>
 
-<h3>Skill overview</h3>
-<div class="skill-table-wrap">
-<table class="skill-table">
-  <thead>
-    <tr><th>Section</th><th>Domain</th><th>Skill</th><th>Lvl</th><th>Coverage</th><th>Accuracy</th><th>Band</th><th>Last seen</th></tr>
-  </thead>
-  <tbody>
-  {% for row in stats %}
-    {% set pct = (row.attempted / row.total_in_bank * 100)|int if row.total_in_bank else 0 %}
-    {# Compute per-row mastery band #}
-    {% if row.attempted == 0 %}
-      {% set band = 'not_started' %}
-    {% elif pct < 20 %}
-      {% set band = 'exploring' %}
-    {% elif row.accuracy is none or row.accuracy < 65 %}
-      {% set band = 'developing' %}
-    {% elif pct >= 60 and row.accuracy >= 85 %}
-      {% set band = 'mastered' %}
-    {% elif pct >= 40 and row.accuracy >= 65 %}
-      {% set band = 'proficient' %}
-    {% else %}
-      {% set band = 'developing' %}
-    {% endif %}
-    {# Recency decay for this row #}
-    {% if band in ('proficient', 'mastered') and row.last_seen %}
-      {# Jinja can't do date arithmetic; use a simple string length heuristic:
-         last_seen is ISO datetime; we pass days_stale via a filter approach.
-         Instead we just show the date and let the badge colour do the work —
-         full decay is computed in the mastery page via Python. #}
-    {% endif %}
-    <tr>
-      <td>{{ row.section[:4] }}</td>
-      <td>{{ row.domain }}</td>
-      <td>{{ row.skill }}</td>
-      <td>L{{ row.difficulty }}</td>
-      <td>
-        <div class="prog-wrap">
-          <div class="prog-bar"><div class="prog-fill" style="width:{{ pct }}%"></div></div>
-          <span class="prog-text">{{ row.attempted }}/{{ row.total_in_bank }}</span>
-        </div>
-      </td>
-      <td class="{% if row.accuracy is none %}acc-none{% elif row.accuracy >= 80 %}acc-good{% elif row.accuracy >= 60 %}acc-ok{% else %}acc-weak{% endif %}">
-        {{ "%.0f%%"|format(row.accuracy) if row.accuracy is not none else "—" }}
-      </td>
-      <td>
-        {% if band == 'not_started' %}<span class="mastery-dot md-not-started" title="Not started"></span>
-        {% elif band == 'exploring'  %}<span class="mastery-dot md-exploring"   title="Exploring"></span>
-        {% elif band == 'developing' %}<span class="mastery-dot md-developing"  title="Developing"></span>
-        {% elif band == 'proficient' %}<span class="mastery-dot md-proficient"  title="Proficient"></span>
-        {% elif band == 'mastered'   %}<span class="mastery-dot md-mastered"    title="Mastered"></span>
-        {% endif %}
-      </td>
-      <td class="muted">{{ row.last_seen[:10] if row.last_seen else "—" }}</td>
-    </tr>
+{% if dashboard %}
+{% set diff_labels = {1: 'Easy', 2: 'Medium', 3: 'Hard'} %}
+
+<div class="section-tabs">
+  {% for section_name in dashboard.keys() %}
+  <button class="section-tab {% if loop.first %}active{% endif %}"
+          data-section="{{ section_name }}"
+          onclick="switchTab('{{ section_name }}')">
+    {{ section_name }}
+  </button>
   {% endfor %}
-  </tbody>
-</table>
 </div>
-<div class="mastery-legend" style="margin-top:0.5rem">
-  <span class="mastery-dot md-not-started"></span> Not started &nbsp;
-  <span class="mastery-dot md-exploring"></span> Exploring &nbsp;
-  <span class="mastery-dot md-developing"></span> Developing &nbsp;
-  <span class="mastery-dot md-proficient"></span> Proficient &nbsp;
-  <span class="mastery-dot md-mastered"></span> Mastered
-  <span class="muted" style="margin-left:0.5rem">· Full mastery view on <a href="{{ url_for('progress') }}">Progress</a></span>
+
+{% for section_name, section_data in dashboard.items() %}
+<div class="section-panel {% if loop.first %}active{% endif %}" data-section="{{ section_name }}">
+  {% for domain in section_data.domains %}
+  <div class="domain-card">
+    <div class="domain-header">
+      <span class="domain-name">{{ domain.name }}</span>
+      <span class="domain-meta">
+        {{ domain.attempted }}/{{ domain.total_in_bank }}{% if domain.accuracy is not none %} &middot; {{ domain.accuracy }}%{% endif %}
+      </span>
+    </div>
+    {% for skill in domain.skills %}
+    <div class="skill-group">
+      <div class="skill-header">
+        <span class="skill-name">{{ skill.skill }}</span>
+        <span class="mastery-badge mb-{{ skill.band | replace('_', '-') }}">
+          {{ skill.band | replace('_', ' ') | title }}
+        </span>
+      </div>
+      {% for level in skill.levels %}
+      <div class="level-row">
+        <span class="level-label">L{{ level.difficulty }}&thinsp;{{ diff_labels[level.difficulty] }}</span>
+        <span class="level-coverage">{{ level.attempted }}/{{ level.total }}</span>
+        <span class="{% if level.accuracy is none %}acc-none{% elif level.accuracy >= 80 %}acc-good{% elif level.accuracy >= 60 %}acc-ok{% else %}acc-weak{% endif %}">
+          {{ "%.0f%%"|format(level.accuracy) if level.accuracy is not none else "—" }}
+        </span>
+        <span class="level-date">{{ level.last_seen if level.last_seen else "—" }}</span>
+        {% if level.nudge_url %}
+        <a href="{{ level.nudge_url }}" class="nudge-link">↑ L{{ level.nudge_to }}</a>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
 </div>
+{% endfor %}
+
+<div class="mastery-legend">
+  <span class="mastery-badge mb-not-started">Not Started</span>
+  <span class="mastery-badge mb-exploring">Exploring</span>
+  <span class="mastery-badge mb-developing">Developing</span>
+  <span class="mastery-badge mb-proficient">Proficient</span>
+  <span class="mastery-badge mb-mastered">Mastered</span>
+  <span class="mastery-badge mb-review-due">Review Due</span>
+  <span class="muted" style="align-self:center">&middot; <a href="{{ url_for('progress') }}">Full mastery view</a></span>
+</div>
+{% endif %}
+
+<script>
+function switchTab(section) {
+  document.querySelectorAll('.section-tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.section === section));
+  document.querySelectorAll('.section-panel').forEach(p =>
+    p.classList.toggle('active', p.dataset.section === section));
+}
+</script>
 {% endblock %}
