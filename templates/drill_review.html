@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Review {{ idx+1 }}/{{ total }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  main { padding: 0 !important; max-width: 100% !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="drill-layout">
+
+  <!-- ── Top bar ── -->
+  <div class="drill-topbar">
+    <div class="q-progress">
+      <div class="q-progress-fill" style="width:{{ ((idx+1)/total*100)|int }}%"></div>
+    </div>
+    <div class="q-meta">
+      <span class="q-counter">{{ idx+1 }} / {{ total }}</span>
+      <span class="badge-diff diff-{{ q.difficulty }}">{{ ['','Easy','Medium','Hard'][q.difficulty] }}</span>
+      <span class="muted q-skill-label">{{ q.skill }}</span>
+      <span class="review-mode-badge">Review</span>
+      <!-- outcome badge -->
+      {% if correct is true %}
+        <span class="outcome-chip chip-correct">✓ Correct</span>
+      {% elif correct is none %}
+        <span class="outcome-chip chip-selfcheck">? Self-check</span>
+      {% else %}
+        <span class="outcome-chip chip-incorrect">✗ Incorrect
+          {% if valid_answers %}<span class="outcome-correct-ans"> · {{ valid_answers|join(' or ') }}</span>{% endif %}
+        </span>
+      {% endif %}
+      <span class="muted" style="font-size:0.8rem">Your answer: <strong>{{ given }}</strong></span>
+    </div>
+  </div>
+
+  <!-- ── Scrollable AK image ── -->
+  <div class="drill-scroll" id="drill-scroll">
+    <div class="q-image-wrap" onclick="openLightbox(this.querySelector('img').src)">
+      <img src="{{ url_for('serve_image', filename=q.question_id + '_ak.png') }}"
+           alt="Answer Key" class="q-img">
+      <span class="zoom-hint">tap to zoom</span>
+    </div>
+  </div>
+
+  <!-- ── Navigation footer ── -->
+  <div class="drill-footer">
+    <div class="review-nav">
+      {% if prev_idx is not none %}
+        <a href="{{ url_for('drill_review', session_id=session_id, idx=prev_idx) }}"
+           class="btn-secondary">← Prev</a>
+      {% else %}
+        <span></span>
+      {% endif %}
+
+      <a href="{{ url_for('drill_results') }}" class="btn-secondary">Results</a>
+
+      {% if next_idx is not none %}
+        <a href="{{ url_for('drill_review', session_id=session_id, idx=next_idx) }}"
+           class="btn-primary">Next →</a>
+      {% else %}
+        <a href="{{ url_for('drill_pick') }}" class="btn-primary">New drill</a>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox" onclick="closeLightbox()"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9999;overflow:auto;cursor:zoom-out;">
+  <img id="lightbox-img" style="display:block;margin:auto;max-width:none;padding:1rem;">
+</div>
+
+<script>
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+    {% if prev_idx is not none %}
+      window.location = "{{ url_for('drill_review', session_id=session_id, idx=prev_idx) }}";
+    {% endif %}
+  }
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'Enter') {
+    {% if next_idx is not none %}
+      window.location = "{{ url_for('drill_review', session_id=session_id, idx=next_idx) }}";
+    {% else %}
+      window.location = "{{ url_for('drill_pick') }}";
+    {% endif %}
+  }
+  if (e.key === 'Escape') closeLightbox();
+});
+function openLightbox(src) {
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+function closeLightbox() {
+  document.getElementById('lightbox').style.display = 'none';
+  document.body.style.overflow = '';
+}
+</script>
+{% endblock %}

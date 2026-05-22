@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Setup — SAT Prep</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="setup-page">
+<div class="setup-card">
+  <h1>SAT Prep</h1>
+  <p class="setup-sub">Enter the student's name to get started.</p>
+  <form method="POST" action="{{ url_for('setup') }}">
+    <input type="text" name="name" placeholder="Student name" autofocus autocomplete="off" required>
+    <button type="submit">Get started →</button>
+  </form>
+</div>
+</body>
+</html>

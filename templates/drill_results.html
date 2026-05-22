@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Session Results{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Session complete</h2>
+</div>
+
+<div class="card-row">
+  <div class="stat-card">
+    <div class="stat-label">Correct</div>
+    <div class="stat-value">{{ n_correct }} / {{ n_total }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Accuracy</div>
+    <div class="stat-value">{{ (n_correct/n_total*100)|round|int if n_total else 0 }}%</div>
+  </div>
+</div>
+
+{% if wrong_qs %}
+<h3>Incorrect</h3>
+<table class="result-table">
+  <thead><tr><th>Skill</th><th>Level</th><th>Your answer</th></tr></thead>
+  <tbody>
+  {% for q in wrong_qs %}
+  <tr>
+    <td>{{ q.skill }}</td>
+    <td>L{{ q.difficulty }}</td>
+    <td class="acc-weak">{{ q.answer or '—' }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if slow_qs %}
+<h3>Slow questions <span class="hint">(took longer than expected)</span></h3>
+<table class="result-table">
+  <thead><tr><th>Skill</th><th>Level</th><th>Time</th><th>Correct?</th></tr></thead>
+  <tbody>
+  {% for q in slow_qs %}
+  <tr>
+    <td>{{ q.skill }}</td>
+    <td>L{{ q.difficulty }}</td>
+    <td>{{ "%.0f"|format(q.time_sec) }}s</td>
+    <td class="{{ 'acc-good' if q.correct is true else ('acc-none' if q.correct is none else 'acc-weak') }}">{{ '✓' if q.correct is true else ('?' if q.correct is none else '✗') }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if skill_stats %}
+<h3>By skill</h3>
+<table class="result-table">
+  <thead><tr><th>Domain / Level</th><th>Correct</th><th>Accuracy</th></tr></thead>
+  <tbody>
+  {% for key, s in skill_stats.items() %}
+  <tr>
+    <td>{{ key }}</td>
+    <td>{{ s.correct }} / {{ s.total }}</td>
+    <td class="{% if s.correct/s.total >= 0.8 %}acc-good{% elif s.correct/s.total >= 0.6 %}acc-ok{% else %}acc-weak{% endif %}">
+      {{ (s.correct/s.total*100)|round|int }}%
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<h3>Copy to Claude</h3>
+<div class="claude-block" id="claude-text">
+Session: Drill | {{ filters.section }} | {{ filters.domains|join(', ') or 'All domains' }} | {{ filters.skills|join(', ') or 'All skills' }} | L{{ filters.difficulties|join('/') or 'All' }} | {{ date }}
+Student: {{ student_name }}
+Results: {{ n_correct }}/{{ n_total }} correct ({{ (n_correct/n_total*100)|round|int if n_total else 0 }}%)
+
+By skill:
+{% for key, s in skill_stats.items() %}  {{ key }}: {{ s.correct }}/{{ s.total }} ({{ (s.correct/s.total*100)|round|int }}%)
+{% endfor %}
+{% if wrong_qs %}
+Incorrect questions:
+{% for q in wrong_qs %}  {{ q.qid }} — {{ q.skill }} L{{ q.difficulty }} (answered: {{ q.answer or 'blank' }})
+{% endfor %}{% endif %}
+{% if slow_qs %}
+Slow questions (>expected time):
+{% for q in slow_qs %}  {{ q.qid }} — {{ q.skill }} L{{ q.difficulty }} {{ "%.0f"|format(q.time_sec) }}s {{ '✓' if q.correct else '✗' }}
+{% endfor %}{% endif %}
+</div>
+<button onclick="copyBlock()" class="btn-secondary">Copy</button>
+
+<div class="action-row" style="margin-top:2rem">
+  <a href="{{ url_for('drill_review', session_id=sid, idx=0) }}" class="btn-primary">Review session →</a>
+  <a href="{{ url_for('drill_pick') }}" class="btn-secondary">New drill</a>
+  <a href="{{ url_for('home') }}" class="btn-secondary">Home</a>
+</div>
+
+<script>
+function copyBlock() {
+  const text = document.getElementById('claude-text').innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.target;
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 2000);
+  });
+}
+</script>
+{% endblock %}

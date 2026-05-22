@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Module Results{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Module complete</h2>
+  <p class="muted">{{ module.section }} · {{ 'Easy / Medium' if module.type == 'easy_medium' else 'Hard' }}</p>
+</div>
+
+<div class="card-row">
+  <div class="stat-card">
+    <div class="stat-label">Score</div>
+    <div class="stat-value">{{ n_correct }} / {{ n_total }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Accuracy</div>
+    <div class="stat-value">{{ (n_correct/n_total*100)|round|int if n_total else 0 }}%</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Time used</div>
+    <div class="stat-value">{{ "%d:%02d"|format(time_used//60, time_used%60) }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Time limit</div>
+    <div class="stat-value">{{ "%d:%02d"|format(time_limit//60, time_limit%60) }}</div>
+  </div>
+</div>
+
+<h3>By domain</h3>
+<table class="result-table">
+  <thead><tr><th>Domain</th><th>Correct</th><th>Accuracy</th></tr></thead>
+  <tbody>
+  {% for dom, s in domain_scores.items() %}
+  <tr>
+    <td>{{ dom }}</td>
+    <td>{{ s.correct }} / {{ s.total }}</td>
+    <td class="{% if s.correct/s.total >= 0.8 %}acc-good{% elif s.correct/s.total >= 0.6 %}acc-ok{% else %}acc-weak{% endif %}">
+      {{ (s.correct/s.total*100)|round|int }}%
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h3>Question review</h3>
+<div class="review-grid">
+{% for item in question_review %}
+<div class="review-item {{ 'review-correct' if item.correct is true else ('review-selfcheck' if item.correct is none else 'review-wrong') }}">
+  <div class="review-num">{{ loop.index }}</div>
+  <div class="review-detail">
+    <div class="review-skill">{{ item.q.skill if item.q else item.qid }} · L{{ item.q.difficulty if item.q else '?' }}</div>
+    <div>Your answer: <strong>{{ item.given }}</strong>
+      {% if item.correct is false %} → Correct: <strong>{{ item.valid | join(' or ') }}</strong>
+      {% elif item.correct is none %} <span class="muted">— self-check (see AK image)</span>{% endif %}
+    </div>
+  </div>
+  <div class="review-icon">{{ '✓' if item.correct is true else ('?' if item.correct is none else '✗') }}</div>
+</div>
+{% endfor %}
+</div>
+
+<details style="margin-top:1.5rem">
+  <summary class="muted" style="cursor:pointer">Show answer key images</summary>
+  <div style="margin-top:1rem">
+  {% for item in question_review %}
+  <div style="margin-bottom:1.5rem">
+    <p class="muted" style="margin:0 0 0.25rem">Q{{ loop.index }} · {{ item.q.skill if item.q }} ·
+      <span class="{{ 'acc-good' if item.correct is true else ('acc-none' if item.correct is none else 'acc-weak') }}">
+        {{ '✓' if item.correct is true else ('? self-check' if item.correct is none else '✗ Correct: ' + (item.valid|join(' or '))) }}
+      </span>
+    </p>
+    <img src="{{ url_for('serve_image', filename=item.qid + '_ak.png') }}" class="q-img" style="max-width:600px">
+  </div>
+  {% endfor %}
+  </div>
+</details>
+
+<h3>Copy to Claude</h3>
+<div class="claude-block" id="claude-text">
+Session: Challenge Module | {{ module.section }} | {{ 'Easy/Medium' if module.type == 'easy_medium' else 'Hard' }} | {{ date }}
+Student: {{ student_name }}
+Score: {{ n_correct }}/{{ n_total }} ({{ (n_correct/n_total*100)|round|int if n_total else 0 }}%)
+Time: {{ "%d:%02d"|format(time_used//60, time_used%60) }} / {{ "%d:%02d"|format(time_limit//60, time_limit%60) }}
+
+By domain:
+{% for dom, s in domain_scores.items() %}  {{ dom }}: {{ s.correct }}/{{ s.total }} ({{ (s.correct/s.total*100)|round|int }}%)
+{% endfor %}
+
+Incorrect:
+{% for item in question_review if item.correct is false %}  Q{{ loop.index }} {{ item.qid }} — {{ item.q.skill if item.q else '?' }} L{{ item.q.difficulty if item.q else '?' }} | answered {{ item.given }} | correct {{ item.valid|join(' or ') }}
+{% endfor %}
+Self-check (verify manually):
+{% for item in question_review if item.correct is none %}  Q{{ loop.index }} {{ item.qid }} — {{ item.q.skill if item.q else '?' }} L{{ item.q.difficulty if item.q else '?' }}
+{% endfor %}
+</div>
+<button onclick="copyBlock()" class="btn-secondary">Copy</button>
+
+<div class="action-row" style="margin-top:2rem">
+  <a href="{{ url_for('drill_pick') }}" class="btn-primary">Drill weak areas</a>
+  <a href="{{ url_for('home') }}" class="btn-secondary">Home</a>
+</div>
+
+<script>
+function copyBlock() {
+  navigator.clipboard.writeText(document.getElementById('claude-text').innerText).then(() => {
+    const btn = event.target;
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy', 2000);
+  });
+}
+</script>
+{% endblock %}

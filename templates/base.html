@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}SAT Prep{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+{% block extra_head %}{% endblock %}
+</head>
+<body>
+{% if request.endpoint != 'setup' %}
+<nav>
+  <a href="{{ url_for('home') }}" class="nav-logo">SAT Prep</a>
+  <div class="nav-links">
+    <a href="{{ url_for('drill_pick') }}" {% if request.endpoint in ('drill_pick','drill_question','drill_answer','drill_results') %}class="active"{% endif %}>Drill</a>
+    <a href="{{ url_for('module_pick') }}" {% if request.endpoint in ('module_pick','module_question','module_results') %}class="active"{% endif %}>Challenge</a>
+    <a href="{{ url_for('progress') }}" {% if request.endpoint == 'progress' %}class="active"{% endif %}>Progress</a>
+  </div>
+</nav>
+{% endif %}
+<main>{% block content %}{% endblock %}</main>
+</body>
+</html>

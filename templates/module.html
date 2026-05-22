@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Challenge {{ idx+1 }}/{{ total }}{% endblock %}
+{% block content %}
+<div class="q-header">
+  <div class="q-progress">
+    <div class="q-progress-fill" style="width:{{ ((idx+1)/total*100)|int }}%"></div>
+  </div>
+  <div class="q-meta">
+    <span>{{ idx+1 }} / {{ total }}</span>
+    <span id="timer-display" class="q-timer q-timer-timed">--:--</span>
+    <span class="muted">{{ q.skill }}</span>
+  </div>
+</div>
+
+<div class="q-image-wrap" onclick="openLightbox(this.querySelector('img').src)" title="Click to zoom">
+  <img src="{{ url_for('serve_image', filename=q.question_id + '_q.png') }}" alt="Question" class="q-img">
+  <span class="zoom-hint">🔍 click to zoom</span>
+</div>
+
+<div id="lightbox" onclick="closeLightbox()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:999;overflow:auto;cursor:zoom-out;">
+  <img id="lightbox-img" style="display:block;margin:auto;max-width:none;padding:1rem;">
+</div>
+
+<div class="answer-area" id="answer-area">
+  {% if q.question_type == 'mcq' %}
+  <div class="answer-row">
+    {% for opt in ['A','B','C','D'] %}
+    <button type="button" class="ans-btn" data-val="{{ opt }}" onclick="selectAnswer(this)">{{ opt }}</button>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="spr-row">
+    <input type="text" id="spr-input" placeholder="Enter your answer" autocomplete="off">
+  </div>
+  {% endif %}
+
+  <div class="module-nav">
+    {% if idx > 0 %}
+    <button type="button" class="btn-secondary" onclick="navigate({{ idx-1 }})">← Back</button>
+    {% endif %}
+    {% if idx < total-1 %}
+    <button type="button" class="btn-primary" onclick="saveAndNavigate({{ idx+1 }})">Next →</button>
+    {% else %}
+    <button type="button" class="btn-primary" onclick="submitModule()">Submit module</button>
+    {% endif %}
+  </div>
+</div>
+
+<form method="POST" action="{{ url_for('module_submit_get') }}" id="submit-form">
+  <input type="hidden" name="time_used" id="time-used-input" value="0">
+</form>
+
+<script>
+function openLightbox(src) {
+  const lb = document.getElementById('lightbox');
+  document.getElementById('lightbox-img').src = src;
+  lb.style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+function closeLightbox() {
+  document.getElementById('lightbox').style.display = 'none';
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeLightbox(); });
+
+const TIME_LIMIT = {{ time_limit }};
+const ATTEMPT_ID = "{{ attempt_id }}";
+const QIDS = {{ qids_json }};
+const CURRENT_IDX = {{ idx }};
+const CURRENT_QID = "{{ q.question_id }}";
+const QTYPE = "{{ q.question_type }}";
+
+// Timer — stored in sessionStorage so it survives page navigation
+let remaining;
+const storageKey = 'timer_' + ATTEMPT_ID;
+const stored = sessionStorage.getItem(storageKey);
+remaining = stored !== null ? parseInt(stored) : TIME_LIMIT;
+
+function tick() {
+  remaining = Math.max(0, remaining - 1);
+  sessionStorage.setItem(storageKey, remaining);
+  const m = Math.floor(remaining/60), s = remaining%60;
+  const disp = document.getElementById('timer-display');
+  disp.textContent = m + ':' + (s<10?'0':'') + s;
+  disp.className = 'q-timer q-timer-timed' +
+    (remaining < TIME_LIMIT*0.1 ? ' timer-red' : remaining < TIME_LIMIT*0.25 ? ' timer-amber' : '');
+  if (remaining <= 0) { submitModule(); return; }
+  setTimeout(tick, 1000);
+}
+setTimeout(tick, 1000);
+
+// Restore previous answer for this question
+const savedAnswers = JSON.parse(sessionStorage.getItem('answers_' + ATTEMPT_ID) || '{}');
+window.addEventListener('load', () => {
+  const prev = savedAnswers[CURRENT_QID];
+  if (prev) {
+    if (QTYPE === 'mcq') {
+      const btn = document.querySelector(`.ans-btn[data-val="${prev}"]`);
+      if (btn) btn.classList.add('selected');
+    } else {
+      const inp = document.getElementById('spr-input');
+      if (inp) inp.value = prev;
+    }
+  }
+});
+
+function currentAnswer() {
+  if (QTYPE === 'mcq') {
+    const sel = document.querySelector('.ans-btn.selected');
+    return sel ? sel.dataset.val : '';
+  } else {
+    return (document.getElementById('spr-input')?.value || '').trim();
+  }
+}
+
+function selectAnswer(btn) {
+  document.querySelectorAll('.ans-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+
+function saveCurrentAnswer() {
+  const ans = currentAnswer();
+  savedAnswers[CURRENT_QID] = ans;
+  sessionStorage.setItem('answers_' + ATTEMPT_ID, JSON.stringify(savedAnswers));
+  return fetch('/module/save_answer', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({qid: CURRENT_QID, answer: ans, idx: CURRENT_IDX})
+  });
+}
+
+function navigate(idx) {
+  saveCurrentAnswer().then(() => {
+    window.location.href = '/module/q?_idx=' + idx;
+  });
+}
+
+function saveAndNavigate(idx) {
+  saveCurrentAnswer().then(() => {
+    window.location.href = '/module/q';
+  });
+}
+
+function submitModule() {
+  saveCurrentAnswer().then(() => {
+    // Push all saved answers to server then submit
+    const pushAll = Object.entries(savedAnswers).map(([qid, ans]) =>
+      fetch('/module/save_answer', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({qid, answer: ans, idx: CURRENT_IDX})
+      })
+    );
+    Promise.all(pushAll).then(() => {
+      document.getElementById('time-used-input').value = TIME_LIMIT - remaining;
+      sessionStorage.removeItem(storageKey);
+      sessionStorage.removeItem('answers_' + ATTEMPT_ID);
+      document.getElementById('submit-form').submit();
+    });
+  });
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (QTYPE === 'mcq' && ['a','b','c','d'].includes(e.key.toLowerCase())) {
+    const btn = document.querySelector(`.ans-btn[data-val="${e.key.toUpperCase()}"]`);
+    if (btn) selectAnswer(btn);
+  }
+});
+</script>
+{% endblock %}

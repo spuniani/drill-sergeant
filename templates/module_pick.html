@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Challenge Session{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Challenge Session</h2>
+  <p class="muted">Timed — simulates a real SAT module. Complete all questions before time runs out.</p>
+</div>
+
+<div class="module-grid">
+{% for m in modules %}
+<div class="module-card">
+  <div class="module-section">{{ m.section }}</div>
+  <div class="module-type {{ 'type-em' if 'Easy' in m.type else 'type-hd' }}">{{ m.type }}</div>
+  <div class="module-meta">{{ m.n_questions }} questions &nbsp;·&nbsp; {{ m.time_display }}</div>
+  <form method="POST" action="{{ url_for('module_start') }}">
+    <input type="hidden" name="module_id" value="{{ m.module_id }}">
+    <button type="submit" class="btn-primary" style="width:100%;margin-top:0.75rem">Start →</button>
+  </form>
+</div>
+{% endfor %}
+</div>
+
+{% if attempt_no > 0 %}
+<p class="muted" style="margin-top:1.5rem">You've completed {{ attempt_no }} timed module{{ 's' if attempt_no != 1 }}.
+  Time scaling: {% if attempt_no < 4 %}1.30×{% elif attempt_no < 8 %}1.15×{% else %}1.00× (SAT time){% endif %}
+</p>
+{% endif %}
+{% endblock %}

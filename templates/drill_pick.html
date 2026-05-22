@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Drill — SAT Prep{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>New Drill Session</h2>
+</div>
+
+{% if request.args.get('error') == 'no_questions' %}
+<div class="alert">No questions available for that selection. Try different filters or a longer recency window.</div>
+{% endif %}
+
+<form method="POST" action="{{ url_for('drill_start') }}" id="drill-form">
+
+  <div class="field-group">
+    <label>Section</label>
+    <div class="pill-row">
+      {% for s in sections %}
+      <label class="pill">
+        <input type="radio" name="section" value="{{ s }}" {% if section == s %}checked{% endif %} onchange="fetchDomains(this.value)">
+        <span>{{ s }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="field-group" id="domain-group" {% if not all_domains %}style="display:none"{% endif %}>
+    <label>Domain <span class="hint">(pick one or more)</span></label>
+    <div class="pill-row" id="domain-pills">
+      {% for d in all_domains %}
+      <label class="pill">
+        <input type="checkbox" name="domain" value="{{ d }}" {% if d in domains %}checked{% endif %} onchange="fetchSkills()">
+        <span>{{ d }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="field-group" id="skill-group" {% if not all_skills %}style="display:none"{% endif %}>
+    <label>Skill <span class="hint">(leave all unchecked = all skills)</span></label>
+    <div class="pill-row" id="skill-pills">
+      {% for sk in all_skills %}
+      <label class="pill">
+        <input type="checkbox" name="skill" value="{{ sk }}" {% if sk in skills %}checked{% endif %}>
+        <span>{{ sk }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="field-group">
+    <label>Difficulty</label>
+    <div class="pill-row">
+      {% for lv, label in [(1,'Easy'),(2,'Medium'),(3,'Hard')] %}
+      <label class="pill">
+        <input type="checkbox" name="difficulty" value="{{ lv }}" checked>
+        <span>{{ label }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="field-group">
+    <label>Number of questions</label>
+    <div class="pill-row">
+      {% for n in [10, 15, 20, 25] %}
+      <label class="pill">
+        <input type="radio" name="n" value="{{ n }}" {% if n == 10 %}checked{% endif %}>
+        <span>{{ n }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <button type="submit" class="btn-primary" style="margin-top:1.5rem">Start →</button>
+</form>
+
+<script>
+function fetchDomains(section) {
+  fetch('/api/domains?section=' + encodeURIComponent(section))
+    .then(r => r.json()).then(domains => {
+      const grp  = document.getElementById('domain-group');
+      const pills = document.getElementById('domain-pills');
+      pills.innerHTML = domains.map(d =>
+        `<label class="pill"><input type="checkbox" name="domain" value="${d}" onchange="fetchSkills()"><span>${d}</span></label>`
+      ).join('');
+      grp.style.display = domains.length ? '' : 'none';
+      document.getElementById('skill-group').style.display = 'none';
+    });
+}
+
+function fetchSkills() {
+  const section = document.querySelector('input[name=section]:checked');
+  const domBoxes = document.querySelectorAll('input[name=domain]:checked');
+  if (!section || !domBoxes.length) return;
+  const params = new URLSearchParams();
+  params.append('section', section.value);
+  domBoxes.forEach(cb => params.append('domain', cb.value));
+  fetch('/api/skills?' + params)
+    .then(r => r.json()).then(skills => {
+      const grp  = document.getElementById('skill-group');
+      const pills = document.getElementById('skill-pills');
+      pills.innerHTML = skills.map(sk =>
+        `<label class="pill"><input type="checkbox" name="skill" value="${sk}"><span>${sk}</span></label>`
+      ).join('');
+      grp.style.display = skills.length ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}

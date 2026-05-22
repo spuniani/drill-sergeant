@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Drill {{ idx+1 }}/{{ total }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Drill page owns its own full-viewport layout — strip main's padding and width cap */
+  main { padding: 0 !important; max-width: 100% !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+{# Full-viewport layout: header bar → scrollable image → sticky footer #}
+<div class="drill-layout">
+
+  <!-- ── Top bar ── -->
+  <div class="drill-topbar">
+    <div class="q-progress">
+      <div class="q-progress-fill" style="width:{{ ((idx+1)/total*100)|int }}%"></div>
+    </div>
+    <div class="q-meta">
+      <span class="q-counter">{{ idx+1 }} / {{ total }}</span>
+      <span class="badge-diff diff-{{ q.difficulty }}">{{ ['','Easy','Medium','Hard'][q.difficulty] }}</span>
+      <span class="muted q-skill-label">{{ q.skill }}</span>
+      <span id="timer" class="q-timer">0:00</span>
+    </div>
+  </div>
+
+  <!-- ── Scrollable image area ── -->
+  <div class="drill-scroll" id="drill-scroll">
+    {% if not show_answer %}
+      <div class="q-image-wrap" onclick="openLightbox(this.querySelector('img').src)">
+        <img src="{{ url_for('serve_image', filename=q.question_id + '_q.png') }}" alt="Question" class="q-img">
+        <span class="zoom-hint">tap to zoom</span>
+      </div>
+    {% else %}
+      {# AK image already contains the question — replace entirely #}
+      <div class="q-image-wrap" onclick="openLightbox(this.querySelector('img').src)">
+        <img src="{{ url_for('serve_image', filename=q.question_id + '_ak.png') }}" alt="Answer Key" class="q-img">
+        <span class="zoom-hint">tap to zoom</span>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- ── Sticky footer ── -->
+  <div class="drill-footer">
+
+    {% if not show_answer %}
+    <!-- Before submit -->
+    <form method="POST" action="{{ url_for('drill_answer') }}" id="answer-form">
+      <input type="hidden" name="qid" value="{{ q.question_id }}">
+      <input type="hidden" name="time_sec" id="time-input" value="0">
+
+      {% if q.question_type == 'mcq' %}
+      <div class="footer-mcq">
+        <div class="ans-row">
+          {% for opt in ['A','B','C','D'] %}
+          <button type="button" class="ans-btn" data-val="{{ opt }}" onclick="selectAnswer(this)">{{ opt }}</button>
+          {% endfor %}
+        </div>
+        <input type="hidden" name="answer" id="answer-hidden" value="">
+        <button type="submit" class="btn-primary btn-submit" id="submit-btn" disabled>Submit</button>
+      </div>
+
+      {% else %}
+      <div class="footer-spr">
+        <input type="text" name="answer" id="spr-input" placeholder="Enter answer" autocomplete="off" autocorrect="off">
+        <button type="submit" class="btn-primary btn-submit">Submit</button>
+      </div>
+      {% endif %}
+    </form>
+
+    {% else %}
+    <!-- After submit: outcome + CTAs -->
+    <div class="footer-result {{ 'res-correct' if correct else ('res-selfcheck' if correct is none else 'res-incorrect') }}">
+      <div class="result-outcome">
+        {% if correct %}
+          <span class="outcome-icon">✓</span><span class="outcome-text">Correct</span>
+        {% elif correct is none %}
+          <span class="outcome-icon">?</span><span class="outcome-text">Self-check above</span>
+        {% else %}
+          <span class="outcome-icon">✗</span>
+          <span class="outcome-text">Incorrect
+            {% if valid_answers %}<span class="outcome-correct-ans">· correct: {{ valid_answers | join(' or ') }}</span>{% endif %}
+          </span>
+        {% endif %}
+      </div>
+      <form method="POST" action="{{ url_for('drill_next') }}" class="result-ctas" id="next-form">
+        <input type="hidden" name="flag" value="0" id="flag-input">
+        <button type="button" class="btn-flag" onclick="flagAndNext()">Revisit</button>
+        <button type="submit" class="btn-primary">Next →</button>
+      </form>
+    </div>
+    {% endif %}
+
+  </div><!-- /footer -->
+</div><!-- /drill-layout -->
+
+<!-- Lightbox -->
+<div id="lightbox" onclick="closeLightbox()"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:9999;overflow:auto;cursor:zoom-out;">
+  <img id="lightbox-img" style="display:block;margin:auto;max-width:none;padding:1rem;">
+</div>
+
+<script>
+// ── Timer ──────────────────────────────────────────────────────────────────
+let elapsed = 0;
+const timerEl   = document.getElementById('timer');
+const timeInput = document.getElementById('time-input');
+setInterval(() => {
+  elapsed++;
+  const m = Math.floor(elapsed/60), s = elapsed % 60;
+  if (timerEl)   timerEl.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+  if (timeInput) timeInput.value = elapsed;
+}, 1000);
+
+// ── Answer selection ───────────────────────────────────────────────────────
+function selectAnswer(btn) {
+  document.querySelectorAll('.ans-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  document.getElementById('answer-hidden').value = btn.dataset.val;
+  document.getElementById('submit-btn').disabled = false;
+}
+
+// ── Keyboard shortcuts ─────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (['a','b','c','d'].includes(e.key.toLowerCase())) {
+    const btn = document.querySelector(`.ans-btn[data-val="${e.key.toUpperCase()}"]`);
+    if (btn) selectAnswer(btn);
+  }
+  if (e.key === 'Enter') {
+    const sub = document.getElementById('submit-btn');
+    if (sub && !sub.disabled) { document.getElementById('answer-form').submit(); return; }
+    const nxt = document.querySelector('#next-form button[type=submit]');
+    if (nxt) nxt.click();
+  }
+  if (e.key === 'Escape') closeLightbox();
+});
+
+// ── Flag & next ────────────────────────────────────────────────────────────
+function flagAndNext() {
+  document.getElementById('flag-input').value = '1';
+  document.getElementById('next-form').submit();
+}
+
+// ── Scroll to top when AK loads ────────────────────────────────────────────
+{% if show_answer %}
+document.getElementById('drill-scroll').scrollTop = 0;
+{% endif %}
+
+// ── Lightbox ───────────────────────────────────────────────────────────────
+function openLightbox(src) {
+  const lb  = document.getElementById('lightbox');
+  const img = document.getElementById('lightbox-img');
+  img.src = src;
+  lb.style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+function closeLightbox() {
+  document.getElementById('lightbox').style.display = 'none';
+  document.body.style.overflow = '';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Home — SAT Prep{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Hi, {{ name }}</h2>
+</div>
+
+<div class="card-row">
+  <div class="stat-card">
+    <div class="stat-label">Questions answered</div>
+    <div class="stat-value">{{ total_attempted }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Accuracy</div>
+    <div class="stat-value">{{ accuracy }}%</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Drill sessions</div>
+    <div class="stat-value">{{ sessions_done }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Timed modules</div>
+    <div class="stat-value">{{ timed_done }}</div>
+  </div>
+</div>
+
+<div class="action-row">
+  <a href="{{ url_for('drill_pick') }}" class="btn-primary">Start Drill</a>
+  <a href="{{ url_for('module_pick') }}" class="btn-secondary">Challenge Session</a>
+</div>
+
+<h3>Skill overview</h3>
+<div class="skill-table-wrap">
+<table class="skill-table">
+  <thead>
+    <tr><th>Section</th><th>Domain</th><th>Skill</th><th>Lvl</th><th>Coverage</th><th>Accuracy</th><th>Band</th><th>Last seen</th></tr>
+  </thead>
+  <tbody>
+  {% for row in stats %}
+    {% set pct = (row.attempted / row.total_in_bank * 100)|int if row.total_in_bank else 0 %}
+    {# Compute per-row mastery band #}
+    {% if row.attempted == 0 %}
+      {% set band = 'not_started' %}
+    {% elif pct < 20 %}
+      {% set band = 'exploring' %}
+    {% elif row.accuracy is none or row.accuracy < 65 %}
+      {% set band = 'developing' %}
+    {% elif pct >= 60 and row.accuracy >= 85 %}
+      {% set band = 'mastered' %}
+    {% elif pct >= 40 and row.accuracy >= 65 %}
+      {% set band = 'proficient' %}
+    {% else %}
+      {% set band = 'developing' %}
+    {% endif %}
+    {# Recency decay for this row #}
+    {% if band in ('proficient', 'mastered') and row.last_seen %}
+      {# Jinja can't do date arithmetic; use a simple string length heuristic:
+         last_seen is ISO datetime; we pass days_stale via a filter approach.
+         Instead we just show the date and let the badge colour do the work —
+         full decay is computed in the mastery page via Python. #}
+    {% endif %}
+    <tr>
+      <td>{{ row.section[:4] }}</td>
+      <td>{{ row.domain }}</td>
+      <td>{{ row.skill }}</td>
+      <td>L{{ row.difficulty }}</td>
+      <td>
+        <div class="prog-wrap">
+          <div class="prog-bar"><div class="prog-fill" style="width:{{ pct }}%"></div></div>
+          <span class="prog-text">{{ row.attempted }}/{{ row.total_in_bank }}</span>
+        </div>
+      </td>
+      <td class="{% if row.accuracy is none %}acc-none{% elif row.accuracy >= 80 %}acc-good{% elif row.accuracy >= 60 %}acc-ok{% else %}acc-weak{% endif %}">
+        {{ "%.0f%%"|format(row.accuracy) if row.accuracy is not none else "—" }}
+      </td>
+      <td>
+        {% if band == 'not_started' %}<span class="mastery-dot md-not-started" title="Not started"></span>
+        {% elif band == 'exploring'  %}<span class="mastery-dot md-exploring"   title="Exploring"></span>
+        {% elif band == 'developing' %}<span class="mastery-dot md-developing"  title="Developing"></span>
+        {% elif band == 'proficient' %}<span class="mastery-dot md-proficient"  title="Proficient"></span>
+        {% elif band == 'mastered'   %}<span class="mastery-dot md-mastered"    title="Mastered"></span>
+        {% endif %}
+      </td>
+      <td class="muted">{{ row.last_seen[:10] if row.last_seen else "—" }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<div class="mastery-legend" style="margin-top:0.5rem">
+  <span class="mastery-dot md-not-started"></span> Not started &nbsp;
+  <span class="mastery-dot md-exploring"></span> Exploring &nbsp;
+  <span class="mastery-dot md-developing"></span> Developing &nbsp;
+  <span class="mastery-dot md-proficient"></span> Proficient &nbsp;
+  <span class="mastery-dot md-mastered"></span> Mastered
+  <span class="muted" style="margin-left:0.5rem">· Full mastery view on <a href="{{ url_for('progress') }}">Progress</a></span>
+</div>
+{% endblock %}

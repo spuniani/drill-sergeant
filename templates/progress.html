@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Progress{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>{{ name }}'s Progress</h2>
+</div>
+
+{# ── Stat cards ─────────────────────────────────────────────────────────── #}
+<div class="card-row">
+  <div class="stat-card">
+    <div class="stat-label">Time practiced</div>
+    <div class="stat-value">{{ pstats.total_time }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">This week</div>
+    <div class="stat-value">{{ pstats.sessions_week }} <span style="font-size:1rem;font-weight:400;color:#888">sessions</span></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Questions done</div>
+    <div class="stat-value">{{ pstats.distinct_q }}<span style="font-size:1rem;font-weight:400;color:#888">/{{ pstats.bank_size }}</span></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Mastered skills</div>
+    {% set n_mastered = mastery | selectattr('band','eq','mastered') | list | length %}
+    {% set n_total_skills = mastery | length %}
+    <div class="stat-value">{{ n_mastered }}<span style="font-size:1rem;font-weight:400;color:#888">/{{ n_total_skills }}</span></div>
+  </div>
+</div>
+
+{# ── Accuracy trend ─────────────────────────────────────────────────────── #}
+{% if pstats.trend %}
+<h3>Accuracy — last {{ pstats.trend | length }} drill sessions</h3>
+<div class="trend-section">
+  <div class="trend-chart">
+    {% for s in pstats.trend %}
+      {% set pct = (s.n_correct / s.n_scored * 100)|round|int if s.n_scored else 0 %}
+      {% if pct >= 80 %}{% set bar_class = 'trend-good' %}
+      {% elif pct >= 60 %}{% set bar_class = 'trend-ok' %}
+      {% else %}{% set bar_class = 'trend-weak' %}{% endif %}
+      {% if loop.last %}{% set bar_class = bar_class + ' trend-latest' %}{% endif %}
+      <div class="trend-col">
+        <span class="trend-pct">{{ pct }}%</span>
+        <div class="trend-bar {{ bar_class }}" style="height:{{ [pct, 4]|max }}%"></div>
+        <span class="trend-date">{{ s.day[5:] }}</span>
+      </div>
+    {% endfor %}
+  </div>
+  <div class="trend-legend">
+    <span class="tleg tleg-good">≥80%</span>
+    <span class="tleg tleg-ok">60–79%</span>
+    <span class="tleg tleg-weak">&lt;60%</span>
+    <span class="tleg" style="color:#555">▐ = most recent</span>
+  </div>
+</div>
+{% endif %}
+
+{# ── Skill mastery table ─────────────────────────────────────────────────── #}
+<h3>Skill mastery</h3>
+{% set band_labels = {
+  'not_started': ('⬜', 'Not started'),
+  'exploring':   ('🔵', 'Exploring'),
+  'developing':  ('🟡', 'Developing'),
+  'proficient':  ('🟢', 'Proficient'),
+  'mastered':    ('✅', 'Mastered'),
+  'review_due':  ('🔁', 'Review due'),
+} %}
+<div class="mastery-legend">
+  {% for band, (icon, label) in band_labels.items() %}
+    {% set count = mastery | selectattr('band','eq',band) | list | length %}
+    {% if count > 0 %}
+    <span class="mastery-badge mb-{{ band | replace('_','-') }}">{{ icon }} {{ label }} · {{ count }}</span>
+    {% endif %}
+  {% endfor %}
+</div>
+<div class="skill-table-wrap" style="margin-top:0.75rem">
+<table class="skill-table">
+  <thead>
+    <tr><th>Section</th><th>Domain</th><th>Skill</th><th>Mastery</th><th>Coverage</th><th>W. Accuracy</th><th>Last seen</th></tr>
+  </thead>
+  <tbody>
+  {% for row in mastery %}
+  <tr>
+    <td>{{ row.section[:4] }}</td>
+    <td>{{ row.domain }}</td>
+    <td>{{ row.skill }}</td>
+    <td>
+      <span class="mastery-badge mb-{{ row.band | replace('_','-') }}">
+        {{ band_labels[row.band][0] }} {{ band_labels[row.band][1] }}{% if row.days_since is not none and row.days_since > 0 %}<span class="mastery-age"> · {{ row.days_since }}d</span>{% endif %}
+      </span>
+    </td>
+    <td>
+      <div class="prog-wrap">
+        <div class="prog-bar"><div class="prog-fill" style="width:{{ row.coverage_pct }}%"></div></div>
+        <span class="prog-text">{{ row.attempted }}/{{ row.total_in_bank }}</span>
+      </div>
+    </td>
+    <td class="{% if row.w_accuracy is none %}acc-none{% elif row.w_accuracy >= 85 %}acc-good{% elif row.w_accuracy >= 65 %}acc-ok{% else %}acc-weak{% endif %}">
+      {{ "%.0f%%"|format(row.w_accuracy) if row.w_accuracy is not none else "—" }}
+    </td>
+    <td class="muted">{{ row.last_seen[:10] if row.last_seen else "—" }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{# ── Recent drill sessions ────────────────────────────────────────────────── #}
+{% if recent_drills %}
+<h3>Recent drill sessions</h3>
+<table class="result-table">
+  <thead><tr><th>Date</th><th>Section</th><th>Filters</th><th>Score</th><th></th></tr></thead>
+  <tbody>
+  {% for d in recent_drills %}
+    {% set f = d.filters_json | fromjson %}
+    {% set ans = d.answers_json | fromjson %}
+    {% set n_correct = ans.values() | selectattr('correct', 'eq', true) | list | length %}
+    {% set n_scored  = ans.values() | rejectattr('correct', 'eq', none) | list | length %}
+  <tr>
+    <td>{{ d.completed_at[:10] if d.completed_at else d.started_at[:10] }}</td>
+    <td>{{ f.section or '—' }}</td>
+    <td class="muted" style="font-size:0.82rem">
+      {{ f.domains | join(', ') or 'All domains' }} ·
+      {{ f.skills  | join(', ') or 'All skills'  }} ·
+      {% if f.difficulties %}L{{ f.difficulties | join('/') }}{% else %}All levels{% endif %}
+    </td>
+    <td>
+      {% if n_scored %}
+        <span class="{% if n_correct/n_scored >= 0.8 %}acc-good{% elif n_correct/n_scored >= 0.6 %}acc-ok{% else %}acc-weak{% endif %}">
+          {{ n_correct }}/{{ n_scored }}
+        </span>
+      {% else %}—{% endif %}
+    </td>
+    <td class="link-group">
+      <a href="{{ url_for('drill_results', from_sid=d.session_id) }}" class="link-action">Results</a>
+      <a href="{{ url_for('drill_review',  session_id=d.session_id, idx=0) }}" class="link-action">Review</a>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{# ── Recent challenge sessions ───────────────────────────────────────────── #}
+{% if recent_modules %}
+<h3>Recent challenge sessions</h3>
+<table class="result-table">
+  <thead><tr><th>Date</th><th>Section</th><th>Type</th><th>Score</th><th>Accuracy</th><th></th></tr></thead>
+  <tbody>
+  {% for m in recent_modules %}
+  <tr>
+    <td>{{ m.completed_at[:10] }}</td>
+    <td>{{ m.section }}</td>
+    <td>{{ 'Easy/Med' if m.type == 'easy_medium' else 'Hard' }}</td>
+    <td>{{ m.n_correct or 0 }} / {{ m.n_total or 0 }}</td>
+    <td class="{% if m.n_total and m.n_correct/m.n_total >= 0.8 %}acc-good{% elif m.n_total and m.n_correct/m.n_total >= 0.6 %}acc-ok{% else %}acc-weak{% endif %}">
+      {{ (m.n_correct/m.n_total*100)|round|int if m.n_total else '—' }}%
+    </td>
+    <td><a href="{{ url_for('module_results', attempt_id=m.attempt_id) }}" class="link-action">Results</a></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% endblock %}

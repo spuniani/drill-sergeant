@@ -1,0 +1,23 @@
+# ── Data & assets (stay on disk, not in repo) ─────────────────────────────────
+app.db
+app.db-shm
+app.db-wal
+question_bank/
+sat_prep.log
+
+# ── PyInstaller build output ───────────────────────────────────────────────────
+dist/
+build/
+*.spec
+
+# ── Python ─────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+# ── macOS ──────────────────────────────────────────────────────────────────────
+.DS_Store
+.fuse_hidden*
