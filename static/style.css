@@ -344,9 +344,6 @@ main { max-width: 860px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
 .tleg-ok::before   { background: #fde68a; }
 .tleg-weak::before { background: #fca5a5; }
 
-/* ── Dashboard: stat summary line ────────────────────────────────────────── */
-.stat-summary { color: #666; font-size: 0.9rem; margin: -0.5rem 0 1.25rem; }
-
 /* ── Dashboard: section tabs ─────────────────────────────────────────────── */
 .section-tabs {
   display: flex;
