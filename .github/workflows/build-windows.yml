@@ -19,7 +19,6 @@ jobs:
 
       - name: Install dependencies
         run: pip install flask pyinstaller
-        working-directory: sat_app
 
       - name: Build binary
         run: >
@@ -35,7 +34,6 @@ jobs:
           --hidden-import uuid
           --hidden-import json
           app.py
-        working-directory: sat_app
 
       - name: Create launcher
         shell: cmd
@@ -44,12 +42,12 @@ jobs:
             echo @echo off
             echo cd /d "%%~dp0"
             echo start "" sat_prep.exe
-          ) > "sat_app\dist\Start SAT Prep.bat"
+          ) > "dist\Start SAT Prep.bat"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: SAT-Prep-Windows
           path: |
-            sat_app/dist/sat_prep.exe
-            sat_app/dist/Start SAT Prep.bat
+            dist/sat_prep.exe
+            dist/Start SAT Prep.bat
