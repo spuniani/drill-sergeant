@@ -1,0 +1,67 @@
+name: Build Windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install flask pyinstaller
+        working-directory: sat_app
+
+      - name: Build binary
+        run: >
+          pyinstaller
+          --onefile
+          --name sat_prep
+          --add-data "templates;templates"
+          --add-data "static;static"
+          --hidden-import flask
+          --hidden-import jinja2
+          --hidden-import werkzeug
+          --hidden-import sqlite3
+          --hidden-import uuid
+          --hidden-import json
+          app.py
+        working-directory: sat_app
+
+      - name: Create launcher
+        shell: cmd
+        run: |
+          (
+            echo @echo off
+            echo cd /d "%%~dp0"
+            echo start "" sat_prep.exe
+          ) > "sat_app\dist\Start SAT Prep.bat"
+
+      - name: Create empty app.db
+        run: |
+          python -c "
+          import sys, os
+          sys.path.insert(0, 'sat_app')
+          import db as DB
+          DB.DB_PATH = os.path.join('sat_app', 'dist', 'app.db')
+          DB.init_db()
+          print('app.db initialised at', DB.DB_PATH)
+          "
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SAT-Prep-Windows
+          path: |
+            sat_app/dist/sat_prep.exe
+            sat_app/dist/Start SAT Prep.bat
+            sat_app/dist/app.db
