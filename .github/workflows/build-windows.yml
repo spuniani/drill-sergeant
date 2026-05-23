@@ -46,17 +46,6 @@ jobs:
             echo start "" sat_prep.exe
           ) > "sat_app\dist\Start SAT Prep.bat"
 
-      - name: Create empty app.db
-        run: |
-          python -c "
-          import sys, os
-          sys.path.insert(0, 'sat_app')
-          import db as DB
-          DB.DB_PATH = os.path.join('sat_app', 'dist', 'app.db')
-          DB.init_db()
-          print('app.db initialised at', DB.DB_PATH)
-          "
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -64,4 +53,3 @@ jobs:
           path: |
             sat_app/dist/sat_prep.exe
             sat_app/dist/Start SAT Prep.bat
-            sat_app/dist/app.db
