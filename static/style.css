@@ -418,18 +418,27 @@ main { max-width: 860px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
 .level-coverage { color: #888; }
 .level-date     { color: #aaa; }
 
-/* ── Dashboard: nudge link ───────────────────────────────────────────────── */
-.nudge-link {
+/* ── Dashboard: level row shortcuts ──────────────────────────────────────── */
+.shortcut {
   font-size: 0.75rem;
   font-weight: 600;
-  color: #2563eb;
-  background: #eff6ff;
-  padding: 0.1rem 0.5rem;
-  border-radius: 20px;
   white-space: nowrap;
   text-decoration: none;
+  border-radius: 20px;
+  padding: 0.1rem 0.5rem;
 }
-.nudge-link:hover { background: #dbeafe; text-decoration: none; }
+/* Up: ready to advance */
+.shortcut-up   { color: #2563eb; background: #eff6ff; }
+.shortcut-up:hover { background: #dbeafe; text-decoration: none; }
+/* Drill: keep going at this level */
+.shortcut-drill {
+  color: #999; font-weight: 400;
+  background: none; padding: 0;
+}
+.shortcut-drill:hover { color: #555; text-decoration: underline; }
+/* Down: struggling, reinforce the level below */
+.shortcut-down  { color: #92400e; background: #fef3c7; }
+.shortcut-down:hover { background: #fde68a; text-decoration: none; }
 
 /* ── Dashboard: mastery legend (below domain cards) ──────────────────────── */
 .mastery-legend { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 1rem; align-items: center; }

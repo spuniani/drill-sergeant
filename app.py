@@ -92,35 +92,51 @@ def _build_dashboard_data(flat_stats, mastery_rows):
     tree = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     for row in flat_stats:
         tree[row["section"]][row["domain"]][row["skill"]].append({
-            "difficulty": row["difficulty"],
-            "attempted":  row["attempted"],
-            "total":      row["total_in_bank"],
-            "accuracy":   row["accuracy"],
-            "last_seen":  row["last_seen"][5:10] if row["last_seen"] else None,
-            "nudge_url":  None,
-            "nudge_to":   None,
+            "difficulty":     row["difficulty"],
+            "attempted":      row["attempted"],
+            "total":          row["total_in_bank"],
+            "accuracy":       row["accuracy"],
+            "last_seen":      row["last_seen"][5:10] if row["last_seen"] else None,
+            "shortcut_url":   None,
+            "shortcut_type":  None,   # "up" | "drill" | "down"
+            "shortcut_label": None,
         })
 
-    # Compute nudge per level: accuracy >= 80%, attempted >= 5, next level < 2 attempts
+    def _drill_url(section, domain, skill, difficulty):
+        return "/drill?" + urllib.parse.urlencode({
+            "section": section, "domain": domain,
+            "skill": skill, "difficulty": difficulty, "n": 10,
+        })
+
+    # Assign one contextual shortcut per level row that has been attempted
     for section, domains in tree.items():
         for domain, skills in domains.items():
             for skill, levels in skills.items():
                 levels.sort(key=lambda l: l["difficulty"])
                 for i, lv in enumerate(levels):
-                    if (lv["accuracy"] is not None
-                            and lv["accuracy"] >= 80
+                    if lv["attempted"] == 0:
+                        continue
+                    acc = lv["accuracy"]
+                    if (acc is not None and acc >= 80
                             and lv["attempted"] >= 5
                             and i + 1 < len(levels)
-                            and levels[i + 1]["attempted"] < 2):
-                        next_diff = levels[i + 1]["difficulty"]
-                        lv["nudge_to"]  = next_diff
-                        lv["nudge_url"] = "/drill?" + urllib.parse.urlencode({
-                            "section":    section,
-                            "domain":     domain,
-                            "skill":      skill,
-                            "difficulty": next_diff,
-                            "n":          10,
-                        })
+                            and levels[i + 1]["attempted"] <= 2):
+                        # Case 1: ready to move up
+                        nd = levels[i + 1]["difficulty"]
+                        lv["shortcut_type"]  = "up"
+                        lv["shortcut_label"] = f"↑ L{nd}"
+                        lv["shortcut_url"]   = _drill_url(section, domain, skill, nd)
+                    elif acc is not None and acc < 60 and i > 0:
+                        # Case 3: struggling — suggest going back down
+                        pd = levels[i - 1]["difficulty"]
+                        lv["shortcut_type"]  = "down"
+                        lv["shortcut_label"] = f"↓ L{pd}"
+                        lv["shortcut_url"]   = _drill_url(section, domain, skill, pd)
+                    else:
+                        # Case 2: keep drilling at current level
+                        lv["shortcut_type"]  = "drill"
+                        lv["shortcut_label"] = "drill"
+                        lv["shortcut_url"]   = _drill_url(section, domain, skill, lv["difficulty"])
 
     # Assemble ordered result
     result = {}

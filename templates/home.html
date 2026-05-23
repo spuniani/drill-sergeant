@@ -47,14 +47,14 @@
       </div>
       {% for level in skill.levels %}
       <div class="level-row">
-        <span class="level-label">L{{ level.difficulty }}&thinsp;{{ diff_labels[level.difficulty] }}</span>
+        <span class="level-label">L{{ level.difficulty }} {{ diff_labels[level.difficulty] }}</span>
         <span class="level-coverage">{{ level.attempted }}/{{ level.total }}</span>
         <span class="{% if level.accuracy is none %}acc-none{% elif level.accuracy >= 80 %}acc-good{% elif level.accuracy >= 60 %}acc-ok{% else %}acc-weak{% endif %}">
           {{ "%.0f%%"|format(level.accuracy) if level.accuracy is not none else "—" }}
         </span>
         <span class="level-date">{{ level.last_seen if level.last_seen else "—" }}</span>
-        {% if level.nudge_url %}
-        <a href="{{ level.nudge_url }}" class="nudge-link">↑ L{{ level.nudge_to }}</a>
+        {% if level.shortcut_url %}
+        <a href="{{ level.shortcut_url }}" class="shortcut shortcut-{{ level.shortcut_type }}">{{ level.shortcut_label }}</a>
         {% endif %}
       </div>
       {% endfor %}
