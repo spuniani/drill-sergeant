@@ -73,6 +73,29 @@ bash build.sh
 
 See BUILD.md for full instructions, update procedure, and macOS quarantine fix.
 
+## Contributing conventions
+
+### Workflow
+1. **Issue first** — open a GH issue before starting work; branch name includes the issue number (e.g. `i9-contributing-conventions`)
+2. **Feature branch always** — never commit directly to `main`
+3. **Tests first** — write failing tests before implementing; commit tests and implementation together
+4. **Tests must pass before PR** — run `python -m pytest` locally; don't open a PR on red
+5. **PR body includes `Closes #N`** — so GitHub auto-closes the issue on merge
+6. **No merge without approval** — PRs wait for review; don't self-merge immediately
+7. **Small focused PRs** — one concern per PR; a feature and its follow-up fix are two PRs
+
+### Code
+- **No `--no-verify`** — never skip pre-commit hooks; fix the root cause instead
+- **Migrations are additive only** — add columns via `ALTER TABLE ... ADD COLUMN`; never drop, rename, or change types (`app.db` persists across installs)
+
+### Testing
+- **Tests live in `tests/test_<module>.py`** mirroring the module they cover
+- **Shared fixtures go in `conftest.py`** — don't duplicate fixture code across test files
+- **Integration tests hit a real (temp) DB** — no mocking `sqlite3`; mock/prod divergence is how bugs slip through
+
+### Review
+- **Self-review the diff before requesting** — read `git diff main` yourself; catch obvious issues before review
+
 ## Active tickets
 
 See `tickets.csv` for the full backlog. High-priority open items:
