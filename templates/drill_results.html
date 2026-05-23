@@ -92,11 +92,15 @@
 <div class="claude-block" id="claude-text">
 Session: Drill | {{ filters.section }} | {{ filters.domains|join(', ') or 'All domains' }} | {{ filters.skills|join(', ') or 'All skills' }} | L{{ filters.difficulties|join('/') or 'All' }} | {{ date }}
 Student: {{ student_name }}
-Results: {{ n_correct }}/{{ n_total }} correct ({{ (n_correct/n_total*100)|round|int if n_total else 0 }}%)
+Results: {{ n_correct }}/{{ n_total }} correct ({{ (n_correct/n_total*100)|round|int if n_total else 0 }}%){% if n_skipped %} | {{ n_skipped }} skipped{% endif %}
 
 By skill:
 {% for key, s in skill_stats.items() %}  {{ key }}: {{ s.correct }}/{{ s.total }} ({{ (s.correct/s.total*100)|round|int }}%)
 {% endfor %}
+{% if skipped_qs %}
+Skipped questions:
+{% for q in skipped_qs %}  {{ q.qid }} — {{ q.skill }} L{{ q.difficulty }}
+{% endfor %}{% endif %}
 {% if wrong_qs %}
 Incorrect questions:
 {% for q in wrong_qs %}  {{ q.qid }} — {{ q.skill }} L{{ q.difficulty }} (answered: {{ q.answer or 'blank' }})
