@@ -343,3 +343,102 @@ main { max-width: 860px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
 .tleg-good::before { background: #86efac; }
 .tleg-ok::before   { background: #fde68a; }
 .tleg-weak::before { background: #fca5a5; }
+
+/* ── Dashboard: stat summary line ────────────────────────────────────────── */
+.stat-summary { color: #666; font-size: 0.9rem; margin: -0.5rem 0 1.25rem; }
+
+/* ── Dashboard: section tabs ─────────────────────────────────────────────── */
+.section-tabs {
+  display: flex;
+  border-bottom: 2px solid #e5e5e5;
+  margin-bottom: 1.25rem;
+}
+.section-tab {
+  padding: 0.45rem 1.25rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.section-tab:hover { color: #1a1a1a; }
+.section-tab.active { color: #2563eb; border-bottom-color: #2563eb; font-weight: 600; }
+
+/* ── Dashboard: section panels ───────────────────────────────────────────── */
+.section-panel { display: none; }
+.section-panel.active { display: block; }
+
+/* ── Dashboard: domain cards ─────────────────────────────────────────────── */
+.domain-card {
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+.domain-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  background: #f9f9f9;
+  border-bottom: 1px solid #e5e5e5;
+}
+.domain-name { font-weight: 600; font-size: 0.9rem; }
+.domain-meta { font-size: 0.8rem; color: #888; }
+
+/* ── Dashboard: skill groups ─────────────────────────────────────────────── */
+.skill-group {
+  padding: 0.7rem 1rem 0.6rem;
+  border-bottom: 1px solid #f0f0f0;
+}
+.skill-group:last-child { border-bottom: none; }
+.skill-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.45rem;
+}
+.skill-name { font-size: 0.875rem; font-weight: 500; }
+
+/* ── Dashboard: level rows — grid keeps columns aligned across all rows ──── */
+.level-row {
+  display: grid;
+  grid-template-columns: 6rem 3.5rem 3.5rem 4rem auto;
+  align-items: center;
+  column-gap: 0.5rem;
+  padding: 0.2rem 0.5rem 0.2rem 1.75rem;
+  font-size: 0.8rem;
+}
+.level-label    { color: #777; }
+.level-coverage { color: #888; }
+.level-date     { color: #aaa; }
+
+/* ── Dashboard: level row shortcuts ──────────────────────────────────────── */
+.shortcut {
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  border-radius: 20px;
+  padding: 0.1rem 0.5rem;
+}
+/* Up: ready to advance */
+.shortcut-up   { color: #2563eb; background: #eff6ff; }
+.shortcut-up:hover { background: #dbeafe; text-decoration: none; }
+/* Drill: keep going at this level */
+.shortcut-drill {
+  color: #999; font-weight: 400;
+  background: none; padding: 0;
+}
+.shortcut-drill:hover { color: #555; text-decoration: underline; }
+/* Down: struggling, reinforce the level below */
+.shortcut-down  { color: #92400e; background: #fef3c7; }
+.shortcut-down:hover { background: #fde68a; text-decoration: none; }
+
+/* ── Dashboard: mastery legend (below domain cards) ──────────────────────── */
+.mastery-legend { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 1rem; align-items: center; }

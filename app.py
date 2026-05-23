@@ -1,5 +1,5 @@
 """app.py — SAT Study Tool (Flask)"""
-import os, sys, json, uuid
+import os, sys, json, uuid, urllib.parse
 from datetime import datetime
 from flask import (Flask, render_template, request, redirect,
                    url_for, session, jsonify, send_from_directory, abort)
@@ -64,14 +64,134 @@ def setup():
             return redirect(url_for("home"))
     return render_template("setup.html")
 
+# ── Dashboard data helpers ────────────────────────────────────────────────────
+DOMAIN_ORDER = {
+    "Math": [
+        "Advanced Math",
+        "Algebra",
+        "Problem-Solving and Data Analysis",
+        "Geometry and Trigonometry",
+    ],
+    "Reading and Writing": [
+        "Craft and Structure",
+        "Information and Ideas",
+        "Expression of Ideas",
+        "Standard English Conventions",
+    ],
+}
+
+def _build_dashboard_data(flat_stats, mastery_rows):
+    """Reshape flat skill×difficulty rows into nested section→domain→skill."""
+    from collections import defaultdict
+
+    mastery_index = {
+        (r["section"], r["domain"], r["skill"]): r for r in mastery_rows
+    }
+
+    # Build tree: section → domain → skill → [level dicts]
+    tree = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    for row in flat_stats:
+        tree[row["section"]][row["domain"]][row["skill"]].append({
+            "difficulty":     row["difficulty"],
+            "attempted":      row["attempted"],
+            "total":          row["total_in_bank"],
+            "accuracy":       row["accuracy"],
+            "last_seen":      row["last_seen"][5:10] if row["last_seen"] else None,
+            "shortcut_url":   None,
+            "shortcut_type":  None,   # "up" | "drill" | "down"
+            "shortcut_label": None,
+        })
+
+    def _drill_url(section, domain, skill, difficulty):
+        return "/drill?" + urllib.parse.urlencode({
+            "section": section, "domain": domain,
+            "skill": skill, "difficulty": difficulty, "n": 10,
+        })
+
+    # One shortcut per skill, on the single level where practice belongs next.
+    # "Current level" = highest difficulty attempted (L1 if nothing attempted yet).
+    for section, domains in tree.items():
+        for domain, skills in domains.items():
+            for skill, levels in skills.items():
+                levels.sort(key=lambda l: l["difficulty"])
+
+                attempted = [j for j, lv in enumerate(levels) if lv["attempted"] > 0]
+                i = attempted[-1] if attempted else 0   # index of current level
+                lv = levels[i]
+                acc = lv["accuracy"]
+
+                if (acc is not None and acc >= 80
+                        and lv["attempted"] >= 5
+                        and i + 1 < len(levels)
+                        and levels[i + 1]["attempted"] <= 2):
+                    # Ready to advance
+                    nd = levels[i + 1]["difficulty"]
+                    lv["shortcut_type"]  = "up"
+                    lv["shortcut_label"] = f"↑ L{nd}"
+                    lv["shortcut_url"]   = _drill_url(section, domain, skill, nd)
+                elif acc is not None and acc < 60 and i > 0:
+                    # Struggling — reinforce level below
+                    pd = levels[i - 1]["difficulty"]
+                    lv["shortcut_type"]  = "down"
+                    lv["shortcut_label"] = f"↓ L{pd}"
+                    lv["shortcut_url"]   = _drill_url(section, domain, skill, pd)
+                else:
+                    # Drill at current level (includes "not started yet → L1")
+                    lv["shortcut_type"]  = "drill"
+                    lv["shortcut_label"] = "drill"
+                    lv["shortcut_url"]   = _drill_url(section, domain, skill, lv["difficulty"])
+
+    # Assemble ordered result
+    result = {}
+    for section in sorted(tree.keys()):
+        order = DOMAIN_ORDER.get(section, [])
+        sorted_domains = sorted(
+            tree[section].keys(),
+            key=lambda d: (order.index(d) if d in order else len(order), d),
+        )
+        domain_list = []
+        for domain in sorted_domains:
+            skill_list = []
+            for skill in sorted(tree[section][domain].keys()):
+                levels = tree[section][domain][skill]
+                m = mastery_index.get((section, domain, skill), {})
+                skill_list.append({
+                    "skill":        skill,
+                    "band":         m.get("band", "not_started"),
+                    "w_accuracy":   m.get("w_accuracy"),
+                    "coverage_pct": m.get("coverage_pct", 0),
+                    "levels":       levels,
+                })
+
+            all_levels = [lv for sk in skill_list for lv in sk["levels"]]
+            dom_attempted = sum(lv["attempted"] for lv in all_levels)
+            dom_total     = sum(lv["total"] for lv in all_levels)
+            scored = [lv for lv in all_levels
+                      if lv["accuracy"] is not None and lv["attempted"] > 0]
+            dom_accuracy = (
+                round(sum(lv["accuracy"] * lv["attempted"] for lv in scored)
+                      / sum(lv["attempted"] for lv in scored), 1)
+                if scored else None
+            )
+
+            domain_list.append({
+                "name":          domain,
+                "total_in_bank": dom_total,
+                "attempted":     dom_attempted,
+                "accuracy":      dom_accuracy,
+                "skills":        skill_list,
+            })
+
+        result[section] = {"domains": domain_list}
+
+    return result
+
+
 # ── Home / Dashboard ──────────────────────────────────────────────────────────
 @app.route("/")
 def home():
-    name    = DB.get_config("student_name", "Student")
-    stats   = DB.get_skill_stats()
-    modules = DB.get_modules()
+    name = DB.get_config("student_name", "Student")
 
-    # Summary cards
     with DB.get_db() as con:
         total_attempted = con.execute(
             "SELECT COUNT(DISTINCT qid) FROM question_history"
@@ -89,7 +209,8 @@ def home():
             "SELECT COUNT(*) FROM module_attempts WHERE completed_at IS NOT NULL"
         ).fetchone()[0]
 
-    accuracy = round(total_correct / total_answers * 100) if total_answers else 0
+    accuracy  = round(total_correct / total_answers * 100) if total_answers else 0
+    dashboard = _build_dashboard_data(DB.get_skill_stats(), DB.get_skill_mastery())
 
     return render_template("home.html",
         name=name,
@@ -97,27 +218,32 @@ def home():
         accuracy=accuracy,
         sessions_done=sessions_done,
         timed_done=timed_done,
-        stats=stats,
-        modules=modules,
+        dashboard=dashboard,
     )
 
 # ── Drill: picker ─────────────────────────────────────────────────────────────
 @app.route("/drill")
 def drill_pick():
-    name    = DB.get_config("student_name", "Student")
-    section = request.args.get("section", "")
-    domains = request.args.getlist("domain")
-    skills  = request.args.getlist("skill")
+    name       = DB.get_config("student_name", "Student")
+    section    = request.args.get("section", "")
+    domains    = request.args.getlist("domain")
+    skills     = request.args.getlist("skill")
+    diff_param = request.args.get("difficulty", "")
+    n_default  = int(request.args.get("n", 10))
 
-    sections     = DB.get_sections()
-    all_domains  = DB.get_domains(section) if section else []
-    all_skills   = DB.get_skills(section, domains) if domains else []
+    difficulty_default = int(diff_param) if diff_param.isdigit() else 0
+
+    sections    = DB.get_sections()
+    all_domains = DB.get_domains(section) if section else []
+    all_skills  = DB.get_skills(section, domains) if domains else []
 
     return render_template("drill_pick.html",
         name=name,
-        section=section, sections=sections,
-        domains=domains, all_domains=all_domains,
-        skills=skills,   all_skills=all_skills,
+        section=section,           sections=sections,
+        domains=domains,           all_domains=all_domains,
+        skills=skills,             all_skills=all_skills,
+        difficulty_default=difficulty_default,
+        n_default=n_default,
     )
 
 # ── Drill: start session ──────────────────────────────────────────────────────

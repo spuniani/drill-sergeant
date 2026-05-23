@@ -52,7 +52,8 @@
     <div class="pill-row">
       {% for lv, label in [(1,'Easy'),(2,'Medium'),(3,'Hard')] %}
       <label class="pill">
-        <input type="checkbox" name="difficulty" value="{{ lv }}" checked>
+        <input type="checkbox" name="difficulty" value="{{ lv }}"
+               {% if difficulty_default == 0 or lv == difficulty_default %}checked{% endif %}>
         <span>{{ label }}</span>
       </label>
       {% endfor %}
@@ -64,7 +65,7 @@
     <div class="pill-row">
       {% for n in [10, 15, 20, 25] %}
       <label class="pill">
-        <input type="radio" name="n" value="{{ n }}" {% if n == 10 %}checked{% endif %}>
+        <input type="radio" name="n" value="{{ n }}" {% if n == n_default %}checked{% endif %}>
         <span>{{ n }}</span>
       </label>
       {% endfor %}
