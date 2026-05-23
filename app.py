@@ -108,35 +108,38 @@ def _build_dashboard_data(flat_stats, mastery_rows):
             "skill": skill, "difficulty": difficulty, "n": 10,
         })
 
-    # Assign one contextual shortcut per level row that has been attempted
+    # One shortcut per skill, on the single level where practice belongs next.
+    # "Current level" = highest difficulty attempted (L1 if nothing attempted yet).
     for section, domains in tree.items():
         for domain, skills in domains.items():
             for skill, levels in skills.items():
                 levels.sort(key=lambda l: l["difficulty"])
-                for i, lv in enumerate(levels):
-                    if lv["attempted"] == 0:
-                        continue
-                    acc = lv["accuracy"]
-                    if (acc is not None and acc >= 80
-                            and lv["attempted"] >= 5
-                            and i + 1 < len(levels)
-                            and levels[i + 1]["attempted"] <= 2):
-                        # Case 1: ready to move up
-                        nd = levels[i + 1]["difficulty"]
-                        lv["shortcut_type"]  = "up"
-                        lv["shortcut_label"] = f"↑ L{nd}"
-                        lv["shortcut_url"]   = _drill_url(section, domain, skill, nd)
-                    elif acc is not None and acc < 60 and i > 0:
-                        # Case 3: struggling — suggest going back down
-                        pd = levels[i - 1]["difficulty"]
-                        lv["shortcut_type"]  = "down"
-                        lv["shortcut_label"] = f"↓ L{pd}"
-                        lv["shortcut_url"]   = _drill_url(section, domain, skill, pd)
-                    else:
-                        # Case 2: keep drilling at current level
-                        lv["shortcut_type"]  = "drill"
-                        lv["shortcut_label"] = "drill"
-                        lv["shortcut_url"]   = _drill_url(section, domain, skill, lv["difficulty"])
+
+                attempted = [j for j, lv in enumerate(levels) if lv["attempted"] > 0]
+                i = attempted[-1] if attempted else 0   # index of current level
+                lv = levels[i]
+                acc = lv["accuracy"]
+
+                if (acc is not None and acc >= 80
+                        and lv["attempted"] >= 5
+                        and i + 1 < len(levels)
+                        and levels[i + 1]["attempted"] <= 2):
+                    # Ready to advance
+                    nd = levels[i + 1]["difficulty"]
+                    lv["shortcut_type"]  = "up"
+                    lv["shortcut_label"] = f"↑ L{nd}"
+                    lv["shortcut_url"]   = _drill_url(section, domain, skill, nd)
+                elif acc is not None and acc < 60 and i > 0:
+                    # Struggling — reinforce level below
+                    pd = levels[i - 1]["difficulty"]
+                    lv["shortcut_type"]  = "down"
+                    lv["shortcut_label"] = f"↓ L{pd}"
+                    lv["shortcut_url"]   = _drill_url(section, domain, skill, pd)
+                else:
+                    # Drill at current level (includes "not started yet → L1")
+                    lv["shortcut_type"]  = "drill"
+                    lv["shortcut_label"] = "drill"
+                    lv["shortcut_url"]   = _drill_url(section, domain, skill, lv["difficulty"])
 
     # Assemble ordered result
     result = {}
