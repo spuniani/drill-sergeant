@@ -14,7 +14,28 @@
     <div class="stat-label">Accuracy</div>
     <div class="stat-value">{{ (n_correct/n_total*100)|round|int if n_total else 0 }}%</div>
   </div>
+  {% if n_skipped %}
+  <div class="stat-card">
+    <div class="stat-label">Skipped</div>
+    <div class="stat-value">{{ n_skipped }}</div>
+  </div>
+  {% endif %}
 </div>
+
+{% if skipped_qs %}
+<h3>Skipped</h3>
+<table class="result-table">
+  <thead><tr><th>Skill</th><th>Level</th></tr></thead>
+  <tbody>
+  {% for q in skipped_qs %}
+  <tr>
+    <td>{{ q.skill }}</td>
+    <td>L{{ q.difficulty }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
 
 {% if wrong_qs %}
 <h3>Incorrect</h3>

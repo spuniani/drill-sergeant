@@ -247,6 +247,21 @@ main { max-width: 860px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
 .chip-correct   { background: #dcfce7; color: #15803d; }
 .chip-incorrect { background: #fef2f2; color: #dc2626; }
 .chip-selfcheck { background: #fef3c7; color: #92400e; }
+.chip-skipped   { background: #f3f4f6; color: #6b7280; }
+
+/* ── Skip / I don't know ──────────────────────────────────────────────────── */
+.btn-skip {
+  width: 100%; margin-top: 0.4rem;
+  background: none; border: 1px solid #e5e5e5;
+  color: #999; font-size: 0.85rem;
+  padding: 0.45rem; border-radius: 8px;
+  cursor: pointer; transition: background 0.12s, color 0.12s;
+}
+.btn-skip:hover { background: #f5f5f5; color: #555; }
+
+.res-skipped { }
+.res-skipped .outcome-icon { color: #9ca3af; }
+.res-skipped .outcome-text { color: #6b7280; }
 .review-nav { display: flex; align-items: center; justify-content: space-between;
   gap: 0.75rem; width: 100%; }
 
