@@ -68,12 +68,22 @@
       </div>
       {% endif %}
     </form>
+    <form method="POST" action="{{ url_for('drill_skip') }}" id="skip-form">
+      <input type="hidden" name="qid" value="{{ q.question_id }}">
+      <input type="hidden" name="time_sec" id="skip-time-input" value="0">
+      <button type="submit" class="btn-skip">I don't know</button>
+    </form>
 
     {% else %}
     <!-- After submit: outcome + CTAs -->
-    <div class="footer-result {{ 'res-correct' if correct else ('res-selfcheck' if correct is none else 'res-incorrect') }}">
+    <div class="footer-result {{ 'res-skipped' if skipped else ('res-correct' if correct else ('res-selfcheck' if correct is none else 'res-incorrect')) }}">
       <div class="result-outcome">
-        {% if correct %}
+        {% if skipped %}
+          <span class="outcome-icon">—</span>
+          <span class="outcome-text">Skipped
+            {% if valid_answers %}<span class="outcome-correct-ans">· answer: {{ valid_answers | join(' or ') }}</span>{% endif %}
+          </span>
+        {% elif correct %}
           <span class="outcome-icon">✓</span><span class="outcome-text">Correct</span>
         {% elif correct is none %}
           <span class="outcome-icon">?</span><span class="outcome-text">Self-check above</span>
@@ -86,7 +96,9 @@
       </div>
       <form method="POST" action="{{ url_for('drill_next') }}" class="result-ctas" id="next-form">
         <input type="hidden" name="flag" value="0" id="flag-input">
+        {% if not skipped %}
         <button type="button" class="btn-flag" onclick="flagAndNext()">Revisit</button>
+        {% endif %}
         <button type="submit" class="btn-primary">Next →</button>
       </form>
     </div>
@@ -104,13 +116,15 @@
 <script>
 // ── Timer ──────────────────────────────────────────────────────────────────
 let elapsed = 0;
-const timerEl   = document.getElementById('timer');
-const timeInput = document.getElementById('time-input');
+const timerEl        = document.getElementById('timer');
+const timeInput      = document.getElementById('time-input');
+const skipTimeInput  = document.getElementById('skip-time-input');
 setInterval(() => {
   elapsed++;
   const m = Math.floor(elapsed/60), s = elapsed % 60;
-  if (timerEl)   timerEl.textContent = m + ':' + (s < 10 ? '0' : '') + s;
-  if (timeInput) timeInput.value = elapsed;
+  if (timerEl)       timerEl.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+  if (timeInput)     timeInput.value = elapsed;
+  if (skipTimeInput) skipTimeInput.value = elapsed;
 }, 1000);
 
 // ── Answer selection ───────────────────────────────────────────────────────

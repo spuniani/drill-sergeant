@@ -23,6 +23,8 @@
       <!-- outcome badge -->
       {% if correct is true %}
         <span class="outcome-chip chip-correct">✓ Correct</span>
+      {% elif skipped %}
+        <span class="outcome-chip chip-skipped">— Skipped</span>
       {% elif correct is none %}
         <span class="outcome-chip chip-selfcheck">? Self-check</span>
       {% else %}
@@ -30,7 +32,7 @@
           {% if valid_answers %}<span class="outcome-correct-ans"> · {{ valid_answers|join(' or ') }}</span>{% endif %}
         </span>
       {% endif %}
-      <span class="muted" style="font-size:0.8rem">Your answer: <strong>{{ given }}</strong></span>
+      <span class="muted" style="font-size:0.8rem">Your answer: <strong>{{ given if given else '—' }}</strong></span>
     </div>
   </div>
 

@@ -300,6 +300,7 @@ def drill_question():
         total=len(qids),
         sid=sid,
         show_answer=False,
+        skipped=False,
     )
 
 # ── Drill: submit answer ──────────────────────────────────────────────────────
@@ -343,7 +344,47 @@ def drill_answer():
     return render_template("drill.html",
         q=q, idx=idx, total=len(qids), sid=sid,
         show_answer=True,
+        skipped=False,
         given=given, correct=correct,
+        valid_answers=valid,
+    )
+
+# ── Drill: skip / I don't know ───────────────────────────────────────────────
+@app.route("/drill/skip", methods=["POST"])
+def drill_skip():
+    sid      = session.get("drill_sid")
+    qids     = session.get("drill_qids", [])
+    idx      = session.get("drill_idx", 0)
+    qid      = request.form.get("qid")
+    time_sec = float(request.form.get("time_sec", 0))
+
+    q = DB.get_question(qid)
+    if not q:
+        return redirect(url_for("drill_results"))
+
+    # Count as incorrect — goes into accuracy denominator as a wrong answer
+    DB.log_answer(qid, sid, "drill", False, time_sec)
+
+    with DB.get_db() as con:
+        row = con.execute(
+            "SELECT answers_json FROM drill_sessions WHERE session_id=?", (sid,)
+        ).fetchone()
+        answers = json.loads(row["answers_json"]) if row else {}
+        answers[qid] = {"answer": "", "correct": False, "time_sec": time_sec, "skipped": True}
+        con.execute(
+            "UPDATE drill_sessions SET answers_json=? WHERE session_id=?",
+            (json.dumps(answers), sid)
+        )
+
+    correct_raw = (q["answer"] or "").strip().upper()
+    valid = [v.strip().upper() for v in correct_raw.split(",")] if correct_raw else []
+
+    return render_template("drill.html",
+        q=q, idx=idx, total=len(qids), sid=sid,
+        show_answer=True,
+        skipped=True,
+        given="",
+        correct=False,
         valid_answers=valid,
     )
 
@@ -391,14 +432,15 @@ def drill_results(from_sid=None):
 
     answers  = json.loads(row["answers_json"] or "{}")
     filters  = json.loads(row["filters_json"] or "{}")
-    # Exclude self-check (correct=None) from scored totals
+    # Skips stored as correct=False with skipped=True — count in denominator (wrong)
     n_correct = sum(1 for v in answers.values() if v["correct"] is True)
     n_total   = sum(1 for v in answers.values() if v["correct"] is not None)
+    n_skipped = sum(1 for v in answers.values() if v.get("skipped"))
 
-    # Per-skill breakdown (scoreable questions only)
+    # Per-skill breakdown (all scored questions including skips)
     skill_stats = {}
     for qid, data in answers.items():
-        if data["correct"] is None: continue   # self-check — skip
+        if data["correct"] is None: continue   # self-check — exclude
         q = DB.get_question(qid)
         if not q: continue
         key = f"{q['domain']} L{q['difficulty']}"
@@ -417,10 +459,14 @@ def drill_results(from_sid=None):
                             "time_sec": data["time_sec"], "correct": data["correct"]})
 
     wrong_qs = []
+    skipped_qs = []
     for qid, data in answers.items():
-        if data["correct"] is False:   # only truly incorrect, not self-check
+        if data["correct"] is False:
             q = DB.get_question(qid)
-            if q:
+            if not q: continue
+            if data.get("skipped"):
+                skipped_qs.append({"qid": qid, "skill": q["skill"], "difficulty": q["difficulty"]})
+            else:
                 wrong_qs.append({"qid": qid, "skill": q["skill"],
                                  "difficulty": q["difficulty"], "answer": data["answer"]})
 
@@ -449,9 +495,11 @@ def drill_results(from_sid=None):
         filters=filters,
         n_correct=n_correct,
         n_total=n_total,
+        n_skipped=n_skipped,
         skill_stats=skill_stats,
         slow_qs=slow_qs,
         wrong_qs=wrong_qs,
+        skipped_qs=skipped_qs,
         domain_rolling=domain_rolling,
         student_name=student_name,
         date=datetime.now().strftime("%Y-%m-%d"),
@@ -480,6 +528,7 @@ def drill_review(session_id, idx):
     ans_data = answers.get(qid, {})
     correct  = ans_data.get("correct")          # True / False / None
     given    = ans_data.get("answer", "—")
+    skipped  = ans_data.get("skipped", False)
 
     correct_raw = (q["answer"] or "").strip().upper() if q else ""
     valid = [v.strip().upper() for v in correct_raw.split(",")] if correct_raw else []
@@ -488,6 +537,7 @@ def drill_review(session_id, idx):
         session_id=session_id,
         q=q, idx=idx, total=total,
         correct=correct, given=given, valid_answers=valid,
+        skipped=skipped,
         prev_idx=idx - 1 if idx > 0 else None,
         next_idx=idx + 1 if idx < total - 1 else None,
     )
