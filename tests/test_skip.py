@@ -193,3 +193,25 @@ def test_results_skipped_section_shown(client):
     assert "Incorrect" in html
     # q001 (skipped) appears only once — not doubled into wrong section
     assert html.count("q001") <= 1
+
+
+def test_claude_summary_includes_skipped(client):
+    """Claude copy block lists skipped questions and skip count in summary line."""
+    answers = {
+        "q001": {"answer": "",  "correct": False, "time_sec": 20.0, "skipped": True},
+        "q002": {"answer": "B", "correct": True,  "time_sec": 30.0},
+    }
+    with DB.get_db() as con:
+        con.execute(
+            """INSERT INTO drill_sessions
+               (session_id, started_at, completed_at, filters_json, questions_json, answers_json)
+               VALUES ('sid6', datetime('now'), datetime('now'), '{}', ?, ?)""",
+            (json.dumps(["q001", "q002"]), json.dumps(answers)),
+        )
+
+    rv = client.get("/drill/results/sid6")
+    html = rv.data.decode()
+
+    assert "1 skipped"       in html   # summary line
+    assert "Skipped questions" in html  # section header in copy block
+    assert "q001"            in html   # skipped qid listed
